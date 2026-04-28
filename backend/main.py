@@ -5,6 +5,7 @@ from typing import Dict
 import sys
 from .config import settings
 from .utils import logger
+from .models.database import init_db
 
 # 常量定义
 APP_NAME = "Hermes Text-to-SQL Agent"
@@ -16,6 +17,7 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     try:
         logger.info(f"Starting {APP_NAME} backend v{APP_VERSION}...")
+        init_db()
         yield
         logger.info(f"Shutting down {APP_NAME} backend...")
     except Exception as e:
@@ -74,6 +76,21 @@ async def root():
 async def health():
     """健康检查端点"""
     return {"status": "healthy"}
+
+@app.get("/api/v1/sessions")
+async def list_sessions():
+    from .models.database import SessionLocal, SessionCreate
+    from .models.schemas import Session
+    from datetime import datetime
+
+    db = SessionLocal()
+    try:
+        sessions = []
+        # 这里应该从数据库查询会话列表
+        # 目前返回空列表
+        return {"sessions": sessions}
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     try:
