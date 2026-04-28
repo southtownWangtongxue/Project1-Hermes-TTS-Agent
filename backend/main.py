@@ -1,11 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from typing import Dict
+from typing import Dict, List
+from sqlalchemy.orm import Session
 import sys
 from .config import settings
 from .utils import logger
-from .models.database import init_db
+from .models.database import init_db, get_db
+from .models.schemas import Session
 
 # 常量定义
 APP_NAME = "Hermes Text-to-SQL Agent"
@@ -78,19 +80,22 @@ async def health():
     return {"status": "healthy"}
 
 @app.get("/api/v1/sessions")
-async def list_sessions():
-    from .models.database import SessionLocal, SessionCreate
-    from .models.schemas import Session
-    from datetime import datetime
+async def list_sessions(db: Session = Depends(get_db)):
+    """
+    获取所有会话列表
 
-    db = SessionLocal()
+    Args:
+        db: 数据库会话（通过依赖注入自动管理）
+
+    Returns:
+        dict: 包含会话列表的响应
+    """
     try:
-        sessions = []
-        # 这里应该从数据库查询会话列表
-        # 目前返回空列表
-        return {"sessions": sessions}
-    finally:
-        db.close()
+        sessions = db.query(Session).all()
+        return {"sessions": [s.dict() for s in sessions]}
+    except Exception as e:
+        logger.error(f"Error fetching sessions: {e}", exc_info=True)
+        raise e
 
 if __name__ == "__main__":
     try:
