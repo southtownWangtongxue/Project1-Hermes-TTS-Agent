@@ -8,6 +8,8 @@ from .config import settings
 from .utils import logger
 from .models.database import init_db, get_db
 from .models.schemas import Session
+from .agents.state import AgentState
+from .agents.router import route_intent, route_sensitive_operation
 
 # 常量定义
 APP_NAME = "Hermes Text-to-SQL Agent"
@@ -64,6 +66,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 定义 LangGraph 图结构（阶段1先定义，具体节点稍后实现）
+# from langgraph.graph import StateGraph
+# workflow = StateGraph(AgentState)
+# workflow.add_node("router", route_intent)
+# workflow.add_node("query_processor", query_processor_node)
+# workflow.add_node("approver", approver_node)
+# workflow.set_entry_point("router")
+# workflow.add_conditional_edges("router", route_sensitive_operation, {
+#     "approver": "approver",
+#     "query": "query_processor"
+# })
+# workflow.add_edge("query_processor", "approver")
+# workflow.add_edge("approver", "query_processor")
+# app_state = workflow.compile()
 
 @app.get("/")
 async def root():
