@@ -15,7 +15,7 @@ class SessionCreate(SessionBase):
     pass
 
 
-class Session(SessionBase):
+class SessionSchema(SessionBase):
     """会话模型（ORM）"""
     id: int
     created_at: str

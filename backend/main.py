@@ -7,7 +7,7 @@ import sys
 from .config import settings
 from .utils import logger
 from .models.database import init_db, get_db
-from .models.schemas import Session
+from .models.schemas import SessionSchema
 from .agents.state import AgentState
 from .agents.router import route_intent, route_sensitive_operation
 

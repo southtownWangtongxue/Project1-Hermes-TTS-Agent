@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 from pydantic import field_validator, model_validator
 from pathlib import Path
 import os
+import sys
 
 class Settings(BaseSettings):
     # Database

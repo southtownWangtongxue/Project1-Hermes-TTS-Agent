@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from .config import settings
+from backend.config import settings
 from typing import Generator
 
 # 创建数据库引擎（带连接池配置）

@@ -1,5 +1,11 @@
 # CLAUDE.md
+# 项目语言规范
 
+请严格遵守以下规则：
+1. 所有对话、解释、建议必须使用**简体中文**。
+2. 代码注释必须使用中文。
+3. 生成的 Commit Message 必须使用中文。
+4. 严禁出现大段未翻译的英文技术名词（保留专业术语如 API、SDK 除外）。
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
