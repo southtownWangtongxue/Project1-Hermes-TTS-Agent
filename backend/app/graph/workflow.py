@@ -109,7 +109,7 @@ def route_orchestrator(state: AgentState) -> str:
         "confidence": state.get("intent_confidence", 0.5),
     }
 
-    route = route_by_intent(intent_result)
+    route =  route_by_intent(intent_result)
     logger.info("[Orchestrator] 路由决策: %s → %s", intent_result["intent"], route)
     return route
 
@@ -545,7 +545,56 @@ async def finish_node(state: AgentState) -> dict:
     logger.info("[Finish] 工作流执行完毕，stage=%s", state.get("stage", "unknown"))
     return {"stage": "finished"}
 
+# ================================================================
+# 检查点管理（应用生命周期级别）
+# ================================================================
 
+_checkpointer = None    # 全局检查点实例
+_redis_cm = None        # Redis 异步上下文管理器引用（用于关闭时清理）
+
+
+async def init_checkpointer():
+    """
+    在应用启动时初始化检查点保存器。
+    必须在 async 环境（FastAPI lifespan）中调用。
+
+    Redis 检查点 API 说明：
+        AsyncRedisSaver.from_conn_string(url) 返回异步上下文管理器，
+        需要通过 async with 进入上下文后才能拿到 BaseCheckpointSaver 实例。
+    """
+    global _checkpointer, _redis_cm
+    try:
+        from langgraph.checkpoint.redis import AsyncRedisSaver
+        from app.core.config import settings
+
+        # 进入异步上下文，获取真正的 saver 实例
+        _redis_cm = AsyncRedisSaver.from_conn_string(settings.REDIS_URL)
+        _checkpointer = await _redis_cm.__aenter__()
+
+        logger.info("[Workflow] Redis 检查点初始化成功: %s", settings.REDIS_URL)
+    except (ImportError, Exception) as exc:
+        logger.warning(
+            "[Workflow] Redis 检查点不可用 (%s)，回退到 MemorySaver",
+            str(exc),
+        )
+        from langgraph.checkpoint.memory import InMemorySaver
+        _checkpointer = InMemorySaver()
+
+
+async def close_checkpointer():
+    """
+    在应用关闭时清理检查点资源。
+    必须在 async 环境（FastAPI lifespan）中调用。
+    """
+    global _checkpointer, _redis_cm
+    if _redis_cm is not None:
+        try:
+            await _redis_cm.__aexit__(None, None, None)
+            logger.info("[Workflow] Redis 检查点已关闭")
+        except Exception as exc:
+            logger.warning("[Workflow] 关闭 Redis 检查点异常: %s", exc)
+        _redis_cm = None
+    _checkpointer = None
 # ================================================================
 # Graph 构建与编译
 # ================================================================
@@ -637,44 +686,12 @@ def get_graph():
     # finish → END（终止节点，Graph 执行结束）
     builder.add_edge("finish", END)
 
-    # ── 编译（含检查点，支持 interrupt 中断恢复） ─────
-    checkpointer = _create_checkpointer()
-    _graph = builder.compile(checkpointer=checkpointer)
+    # ✅ 使用全局已初始化的检查点实例
+    if _checkpointer is None:
+        logger.warning("[Workflow] 检查点未初始化，使用 None（不支持中断恢复）")
 
+    _graph = builder.compile(checkpointer=_checkpointer)
     logger.info("[Workflow] LangGraph 工作流编译完成")
     return _graph
 
 
-def _create_checkpointer():
-    """
-    创建检查点保存器。
-
-    检查点用于：
-        - interrupt() 中断时保存当前状态
-        - 恢复执行时从检查点还原状态
-        - 支持 Human-in-the-loop 审批流程
-
-    优先级：
-        1. Redis AsyncRedisSaver —— 持久化 + 分布式支持
-        2. MemorySaver —— 内存存储，进程重启后丢失
-
-    返回:
-        检查点保存器实例
-    """
-    # 优先尝试 Redis 检查点
-    try:
-        from langgraph.checkpoint.redis import AsyncRedisSaver
-        from app.core.config import settings
-
-        checkpointer = AsyncRedisSaver.from_conn_string(settings.REDIS_URL)
-        logger.info("[Workflow] 使用 Redis 检查点: %s", settings.REDIS_URL)
-        return checkpointer
-    except (ImportError, Exception) as exc:
-        # Redis 不可用时回退到内存检查点
-        logger.warning(
-            "[Workflow] Redis 检查点不可用 (%s)，回退到 MemorySaver",
-            str(exc),
-        )
-        from langgraph.checkpoint.memory import MemorySaver
-
-        return MemorySaver()

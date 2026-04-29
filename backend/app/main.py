@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import router as v1_router
+from app.graph.workflow import init_checkpointer, close_checkpointer
 
 
 @asynccontextmanager
@@ -15,7 +16,9 @@ async def lifespan(app: FastAPI):
     print("[DataAgent Pro] 服务启动中...")
     print("[DataAgent Pro] API 文档: http://localhost:8000/docs")
     print("[DataAgent Pro] 前端开发地址: http://localhost:5173")
+    await init_checkpointer()  # ✅ 启动时初始化（async 环境）
     yield
+    await close_checkpointer()  # ✅ 关闭时清理
     print("[DataAgent Pro] 服务已关闭。")
 
 

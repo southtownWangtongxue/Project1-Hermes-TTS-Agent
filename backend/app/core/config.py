@@ -1,8 +1,11 @@
 """
 应用配置模块 —— 使用 pydantic-settings 从 .env 文件读取所有配置项
 """
-from pydantic_settings import BaseSettings, SettingsConfigDict
+import pathlib
+from pathlib import Path
 
+from pydantic_settings import BaseSettings, SettingsConfigDict
+PROJECT_PATH = pathlib.Path(__file__).parent.parent.parent.parent
 
 class Settings(BaseSettings):
     """全局配置，自动从项目根目录的 .env 文件加载。"""
@@ -21,7 +24,7 @@ class Settings(BaseSettings):
     MILVUS_COLLECTION_NAME: str = "knowledge_base"
 
     # ── Embedding 模型 ─────────────────────────────
-    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_MODEL: str = "BAAI/bge-large-zh-v1.5"
 
     # ── 数据库类型选择 ─────────────────────────────
     DB_TYPE: str = "mysql"  # mysql 或 postgresql
@@ -46,7 +49,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     model_config = SettingsConfigDict(
-        env_file=".env",           # 自动读取项目根目录的 .env
+        env_file=str(PROJECT_PATH / ".env"),           # 自动读取项目根目录的 .env
         env_file_encoding="utf-8",
         extra="ignore",            # 忽略 .env 中未定义的字段
     )
@@ -58,4 +61,7 @@ settings = Settings()
 
 def get_settings() -> Settings:
     """返回全局配置单例实例"""
+    print("PROJECT_PATH", PROJECT_PATH )
+    print(".env exists?:", (PROJECT_PATH / ".env").exists())
+    # print(settings)
     return settings

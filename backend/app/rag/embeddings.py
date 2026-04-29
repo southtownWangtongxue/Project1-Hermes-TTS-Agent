@@ -5,7 +5,7 @@
 import re
 import logging
 from typing import Optional
-
+from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from openai import AsyncOpenAI
 
 from app.core.config import settings
@@ -23,6 +23,7 @@ try:
         utility,
         MilvusException,
     )
+
     _MILVUS_AVAILABLE = True
 except ImportError:
     _MILVUS_AVAILABLE = False
@@ -94,7 +95,7 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]
                 # 按固定步长切分超长句子
                 step = chunk_size - overlap
                 for i in range(0, len(sentence_clean), step):
-                    sub = sentence_clean[i : i + chunk_size]
+                    sub = sentence_clean[i: i + chunk_size]
                     if sub.strip():
                         chunks.append(sub.strip())
                 current_chunk = ""
@@ -142,16 +143,17 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
 
-    client = AsyncOpenAI(
-        api_key=settings.LLM_API_KEY,
-        base_url=settings.LLM_BASE_URL,
+    client = HuggingFaceEmbeddings(
+        model_name='BAAI/bge-large-zh-v1.5',
+        model_kwargs={
+            'device': 'cuda',
+            # 'device': 'cpu',
+        },
+        encode_kwargs={'normalize_embeddings': True}  # set True to compute cosine similarity
     )
 
     try:
-        response = await client.embeddings.create(
-            model=settings.EMBEDDING_MODEL,
-            input=texts,
-        )
+        response = client.embed_documents( texts )
         embeddings = [item.embedding for item in response.data]
         dim = len(embeddings[0]) if embeddings else 0
         logger.info("成功向量化 %d 条文本，维度=%d", len(embeddings), dim)
@@ -234,8 +236,8 @@ def _get_or_create_collection(collection_name: str, dim: int) -> Optional[Collec
 
 
 async def embed_and_store(
-    texts: list[str],
-    collection_name: str = "knowledge_base",
+        texts: list[str],
+        collection_name: str = "knowledge_base",
 ) -> int:
     """
     文本切片 + 向量化 + Milvus 入库的完整流水线。
@@ -287,9 +289,9 @@ async def embed_and_store(
 
     try:
         data = [
-            all_chunks,                   # content 字段
-            embeddings,                   # vector 字段
-            [{}] * len(all_chunks),       # metadata 字段（预留扩展）
+            all_chunks,  # content 字段
+            embeddings,  # vector 字段
+            [{}] * len(all_chunks),  # metadata 字段（预留扩展）
         ]
         insert_result = collection.insert(data)
         collection.flush()

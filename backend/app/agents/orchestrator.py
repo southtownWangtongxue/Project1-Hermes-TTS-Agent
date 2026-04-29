@@ -94,7 +94,7 @@ def _extract_json_from_markdown(text: str) -> str:
     return "\n".join(lines).strip()
 
 
-async def route_by_intent(intent_result: dict) -> str:
+def route_by_intent(intent_result: dict) -> str:
     """
     根据意图分析结果，返回下一步应调用的 Agent 节点名称。
 
