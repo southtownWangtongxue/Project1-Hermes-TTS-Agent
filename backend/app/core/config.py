@@ -1,0 +1,61 @@
+"""
+应用配置模块 —— 使用 pydantic-settings 从 .env 文件读取所有配置项
+"""
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """全局配置，自动从项目根目录的 .env 文件加载。"""
+
+    # ── LLM 大模型配置 ──────────────────────────────
+    LLM_API_KEY: str = ""
+    LLM_BASE_URL: str = "https://api.openai.com/v1"
+    LLM_MODEL_NAME: str = "gpt-4o"
+
+    # ── Redis ───────────────────────────────────────
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    # ── Milvus 向量数据库 ───────────────────────────
+    MILVUS_HOST: str = "localhost"
+    MILVUS_PORT: int = 19530
+    MILVUS_COLLECTION_NAME: str = "knowledge_base"
+
+    # ── Embedding 模型 ─────────────────────────────
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+
+    # ── 数据库类型选择 ─────────────────────────────
+    DB_TYPE: str = "mysql"  # mysql 或 postgresql
+
+    # ── MySQL ───────────────────────────────────────
+    MYSQL_HOST: str = "localhost"
+    MYSQL_PORT: int = 3306
+    MYSQL_USER: str = "root"
+    MYSQL_PASSWORD: str = ""
+    MYSQL_DATABASE: str = "dataagent"
+
+    # ── PostgreSQL ──────────────────────────────────
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = ""
+    POSTGRES_DATABASE: str = "dataagent"
+
+    # ── 应用服务 ────────────────────────────────────
+    APP_HOST: str = "0.0.0.0"
+    APP_PORT: int = 8000
+    DEBUG: bool = True
+
+    model_config = SettingsConfigDict(
+        env_file=".env",           # 自动读取项目根目录的 .env
+        env_file_encoding="utf-8",
+        extra="ignore",            # 忽略 .env 中未定义的字段
+    )
+
+
+# 全局单例配置实例
+settings = Settings()
+
+
+def get_settings() -> Settings:
+    """返回全局配置单例实例"""
+    return settings

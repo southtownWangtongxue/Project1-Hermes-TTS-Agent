@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv sync *)",
+      "Bash(uv run *)",
+      "Bash(npm install *)",
+      "Bash(npx vue-tsc *)",
+      "Bash(git init *)"
+    ]
+  }
+}
