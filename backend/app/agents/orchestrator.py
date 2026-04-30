@@ -7,6 +7,7 @@ import json
 
 from app.core.config import settings
 from app.core.llm import get_llm
+from app.utils.log_utils import log
 
 
 async def analyze_intent(user_question: str) -> dict:
@@ -35,6 +36,8 @@ async def analyze_intent(user_question: str) -> dict:
         "   示例: \"怎么导出报表？\" \"这个系统支持哪些数据库？\" \"什么是索引？\"\n\n"
         "3. write_data —— 用户想要插入、更新、删除数据或修改表结构（需要审批流）\n"
         "   示例: \"把所有北京用户的等级改成 VIP\" \"删除无效订单\"\n\n"
+        "3. other_questions —— 其他类型的问题\n"
+        "   示例: \"长沙今天天气怎么样\"\n\n"
         "严格要求：\n"
         "1. 只返回一个 JSON 对象，不要包含任何其他文字\n"
         "2. JSON 格式为: {\"intent\": \"<类型>\", \"confidence\": <0.0~1.0>}\n"
@@ -55,11 +58,11 @@ async def analyze_intent(user_question: str) -> dict:
         # 尝试从 markdown 代码块中提取 JSON
         if content.startswith("```"):
             content = _extract_json_from_markdown(content)
-
+        log.info(content)
         result = json.loads(content)
 
         # 校验返回字段的合法性
-        valid_intents = {"query_data", "ask_help", "write_data"}
+        valid_intents = {"query_data", "ask_help", "write_data","other_questions"}
         intent = result.get("intent", "query_data")
         confidence = float(result.get("confidence", 0.5))
 
@@ -102,6 +105,7 @@ def route_by_intent(intent_result: dict) -> str:
     - query_data  → schema_agent（查数据，走 Schema → SQL → 执行链路）
     - ask_help    → rag_agent（咨询类问题，走 RAG 知识库检索）
     - write_data  → schema_agent（写入数据，也走 Schema → SQL → Security 链路）
+    - other_questions  → misc_agent（其他类型，回答用户，不是本Agent专业领域，无法回答）
     - 未知意图    → schema_agent（默认尝试走查询链路）
 
     参数:
@@ -118,6 +122,7 @@ def route_by_intent(intent_result: dict) -> str:
         "query_data": "schema_agent",
         "ask_help": "rag_agent",
         "write_data": "schema_agent",  # 也走 Schema → SQL → Security 链路
+        "other_questions": "misc_agent",
     }
 
     return route_map.get(intent, "schema_agent")

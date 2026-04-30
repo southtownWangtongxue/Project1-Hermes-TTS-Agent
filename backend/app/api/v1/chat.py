@@ -15,9 +15,13 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.graph.workflow import get_graph
+from app.utils.log_utils import log
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
@@ -244,7 +248,7 @@ async def chat_completions(body: ChatRequest):
     """
     # 从请求中提取用户最新问题
     question = body.messages[-1].content if body.messages else ""
-
+    log.info(f"[chat_completions] SSE 流式对话,question:{question}")
     return StreamingResponse(
         _stream_chat(question),
         media_type="text/event-stream",

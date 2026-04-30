@@ -61,7 +61,7 @@ settings = Settings()
 
 def get_settings() -> Settings:
     """返回全局配置单例实例"""
-    print("PROJECT_PATH", PROJECT_PATH )
-    print(".env exists?:", (PROJECT_PATH / ".env").exists())
+    # print("PROJECT_PATH", PROJECT_PATH )
+    # print(".env exists?:", (PROJECT_PATH / ".env").exists())
     # print(settings)
     return settings

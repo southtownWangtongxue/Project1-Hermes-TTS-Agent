@@ -4,6 +4,8 @@
 支持 MySQL（通过 asyncmy）和 PostgreSQL（通过 asyncpg）两种后端，
 根据 config 中的 DB_TYPE 配置自动切换。
 """
+import logging
+
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
@@ -11,6 +13,7 @@ from sqlalchemy.ext.asyncio import (
     AsyncEngine,
 )
 from app.core.config import get_settings
+from app.utils.log_utils import log
 
 settings = get_settings()
 
@@ -38,6 +41,7 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         database_url = _build_database_url()
+        log.info(database_url)
         _engine = create_async_engine(
             database_url,
             echo=settings.DEBUG,

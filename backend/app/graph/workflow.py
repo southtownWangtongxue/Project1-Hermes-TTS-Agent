@@ -28,6 +28,7 @@ import logging
 from langgraph.graph import StateGraph, END
 from langgraph.types import interrupt, Command
 
+from app.agents.misc_agent import misc_agent
 from app.agents.orchestrator import analyze_intent, route_by_intent
 from app.agents.schema_agent import get_table_schemas, filter_relevant_tables
 from app.agents.sql_coder import generate_sql, execute_sql
@@ -39,6 +40,10 @@ from app.graph.state import AgentState
 
 logger = logging.getLogger(__name__)
 
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
 # ================================================================
 # 节点函数
 # ================================================================
@@ -85,6 +90,38 @@ async def orchestrator_node(state: AgentState) -> dict:
         "intent_confidence": result["confidence"],
         "stage": "orchestrated",
     }
+async def misc_node(state: AgentState) -> dict:
+    """
+    杂项节点 —— 调用 misc Agent 回答用户。
+    参数:
+        state: 当前 Agent 全局状态，需包含 user_question
+
+    返回:
+        包含   stage 的部分状态更新
+    """
+    user_question = state.get("user_question", "")
+
+    if not user_question.strip():
+        logger.warning("[misc_node] 用户问题为空")
+        return {
+
+            "error_message": "用户问题为空",
+            "stage": "misc",
+        }
+
+    # 调用 Misc Agent
+    logger.info("[Misc] 调用 misc Agent: %s", user_question[:80])
+    result = await misc_agent(user_question)
+
+    logger.info(
+        "[misc_node] 调用 misc Agent完成: intent=%s",
+        result["content"]
+    )
+    msg=state.get("messages", "")
+    logger.info(msg)
+    return {
+        "stage": "misc",
+    }
 
 
 def route_orchestrator(state: AgentState) -> str:
@@ -95,6 +132,7 @@ def route_orchestrator(state: AgentState) -> str:
         - query_data  → schema_agent（数据查询，走 SQL 生成与执行链路）
         - ask_help    → rag_agent（帮助咨询，走 RAG 知识库检索）
         - write_data  → schema_agent（数据写入，走 SQL 链路，由 Security 拦截审批）
+        - other_questions  →misc_agent 其他类型
         - 未知意图    → schema_agent（默认走查询链路兜底）
 
     参数:
@@ -631,6 +669,7 @@ def get_graph():
 
     # 注册所有节点
     builder.add_node("orchestrator", orchestrator_node)
+    builder.add_node("misc_agent", misc_node)
     builder.add_node("schema_agent", schema_node)
     builder.add_node("sql_coder", sql_coder_node)
     builder.add_node("security", security_node)
