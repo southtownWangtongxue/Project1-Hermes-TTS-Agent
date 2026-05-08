@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.graph.workflow import get_graph
+from app.utils.json_encoder import CustomEncoder
 from app.utils.log_utils import log
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ def _sse_event(data: dict) -> str:
     返回:
         形如 "data: {...}\n\n" 的 SSE 事件字符串
     """
-    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+    return f"data: {json.dumps(data, ensure_ascii=False, cls=CustomEncoder)}\n\n"
 
 
 # ================================================================
@@ -113,6 +114,15 @@ async def _stream_chat(question: str):
                         "content": "正在分析您的意图...",
                     })
 
+                # ── schema_agent: 加载表结构 ──────────────
+                elif node_name == "misc_agent":
+                    logger.info("[SSE] misc_agent 阶段")
+                    msg=state_update.get('messages')
+                    logger.info("[SSE] misc_agent 结果=%s",msg[-1].content)
+                    yield _sse_event({
+                        "type": "text",
+                        "content": msg[-1].content,
+                    })
                 # ── schema_agent: 加载表结构 ──────────────
                 elif node_name == "schema_agent":
                     logger.info("[SSE] schema_agent 阶段完成")

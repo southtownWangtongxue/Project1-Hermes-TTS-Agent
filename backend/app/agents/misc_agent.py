@@ -2,10 +2,8 @@
 Misc Agent - 杂项助理
 处理无法意图归类的问题
 """
-import json
 
-from app.core.config import settings
-from app.core.llm import get_llm, get_langchain_llm
+from app.core.llm import get_langchain_llm
 from app.utils.log_utils import log
 
 
@@ -46,19 +44,15 @@ async def misc_agent(user_question: str) -> dict:
 
     try:
         response = await client.ainvoke(
-            model=settings.LLM_MODEL_NAME,
-            messages=[
+            [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_question},
-            ],
-            temperature=1.0,
+            ]
         )
+        log.info(f"misc_agent->content:{response.content}")
+        return response
 
-        log.info(f"misc_agent->content:{response}")
-        # log.info(f"misc_agent->content:{content}")
-
-        return {"messages": response}
-
-    except (json.JSONDecodeError, Exception):
+    except  Exception as e:
         # LLM 返回解析失败，默认按查询数据处理
-        return {"content": "无法归类为查询数据"}
+        log.exception(f"misc_agent->Exception:{e}")
+        return {"content": f"无法归类为查询数据{str(e)}"}

@@ -8,6 +8,7 @@ import math
 
 from app.core.config import settings
 from app.core.llm import get_llm
+from app.utils.json_encoder import CustomEncoder
 
 
 def _basic_stats(data: list[dict], columns: list[str]) -> dict:
@@ -187,7 +188,7 @@ async def analyze_results(
 
     # 将基础统计格式化为易读字符串
     stats_text = json.dumps(stats, ensure_ascii=False, indent=2)
-    sample_text = json.dumps(sample_data, ensure_ascii=False, indent=2)
+    sample_text = json.dumps(sample_data, ensure_ascii=False, indent=2,cls=CustomEncoder)
 
     user_message = (
         f"## 用户问题\n\n{question}\n\n"

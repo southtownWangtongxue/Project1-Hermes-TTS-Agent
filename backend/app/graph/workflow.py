@@ -115,11 +115,12 @@ async def misc_node(state: AgentState) -> dict:
 
     logger.info(
         "[misc_node] 调用 misc Agent完成: intent=%s",
-        result["content"]
+        result
     )
     msg=state.get("messages", "")
     logger.info(msg)
     return {
+        'messages': [result],
         "stage": "misc",
     }
 
@@ -691,6 +692,7 @@ def get_graph():
         {
             "schema_agent": "schema_agent",
             "rag_agent": "rag_agent",
+            "misc_agent": "misc_agent",
         },
     )
 

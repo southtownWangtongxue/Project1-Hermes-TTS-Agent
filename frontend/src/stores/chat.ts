@@ -69,6 +69,15 @@ export const useChatStore = defineStore('chat', () => {
         },
 
         /* 生成的 SQL 语句 */
+        onText(content: string) {
+          messages.value.push({
+            id: generateId(),
+            role: 'assistant',
+            type: 'text',
+            content: content,
+          })
+        },
+        /* 生成的 SQL 语句 */
         onSQL(content: string) {
           messages.value.push({
             id: generateId(),

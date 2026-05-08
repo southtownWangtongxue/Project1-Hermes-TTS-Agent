@@ -6,6 +6,7 @@ import json
 
 from app.core.config import settings
 from app.core.llm import get_llm
+from app.utils.json_encoder import CustomEncoder
 
 
 def _recommend_chart_type(columns: list[str], data: list[dict]) -> str:
@@ -127,7 +128,7 @@ async def generate_chart_config(
         "4. 所有字段使用双引号"
     )
 
-    sample_text = json.dumps(sample_data, ensure_ascii=False, indent=2)
+    sample_text = json.dumps(sample_data, ensure_ascii=False, indent=2,cls=CustomEncoder)
     columns_text = json.dumps(columns, ensure_ascii=False)
 
     user_message = (

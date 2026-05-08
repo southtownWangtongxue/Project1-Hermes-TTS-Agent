@@ -6,6 +6,8 @@ export interface SSEEventCallbacks {
   onStatus?: (content: string) => void
   /* Schema 信息 */
   onSchema?: (content: string) => void
+  /* 生成的 其他信息*/
+  onText?: (content: string) => void
   /* 生成的 SQL 语句 */
   onSQL?: (content: string) => void
   /* 查询结果数据 */
@@ -146,6 +148,9 @@ export function useSSE() {
         break
       case 'sql':
         callbacks.onSQL?.(event.content || '')
+        break
+      case 'text':
+        callbacks.onText?.(event.content || '')
         break
       case 'result':
         callbacks.onResult?.(event.data || [], event.columns || [])
