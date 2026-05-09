@@ -5,6 +5,7 @@
  */
 import { ref, watch, nextTick } from 'vue'
 import { useChatStore, type ChatMessage } from '@/stores/chat'
+import ChartRenderer from '@/components/ChartRenderer.vue'
 
 const store = useChatStore()
 
@@ -165,6 +166,20 @@ function messageClass(msg: ChatMessage): Record<string, boolean> {
                 show-overflow-tooltip
               />
             </el-table>
+          </div>
+        </template>
+
+        <!-- 数据分析洞察 -->
+        <template v-else-if="msg.type === 'analysis'">
+          <div class="message-bubble message-bubble--assistant">
+            {{ msg.content }}
+          </div>
+        </template>
+
+        <!-- 图表消息：ECharts 渲染 -->
+        <template v-else-if="msg.type === 'chart'">
+          <div class="message-chart">
+            <ChartRenderer :config="msg.chartConfig || null" />
           </div>
         </template>
 
@@ -433,6 +448,11 @@ function messageClass(msg: ChatMessage): Record<string, boolean> {
 .result-count {
   font-size: 12px;
   color: #909399;
+}
+
+/* ===== 图表消息 ===== */
+.message-chart {
+  max-width: 92%;
 }
 
 /* ===== 错误消息 ===== */

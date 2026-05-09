@@ -7,11 +7,12 @@ import { useApprovalStore } from '@/stores/approval'
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
-  type?: 'text' | 'sql' | 'result' | 'status' | 'error'
+  type?: 'text' | 'sql' | 'result' | 'chart' | 'analysis' | 'status' | 'error'
   content?: string
   sql?: string
   data?: any[]
   columns?: string[]
+  chartConfig?: Record<string, unknown>
 }
 
 /* 生成唯一消息 ID */
@@ -107,6 +108,26 @@ export const useChatStore = defineStore('chat', () => {
             content: error,
           })
           isLoading.value = false
+        },
+
+        /* 数据分析洞察 */
+        onAnalysis(content: string) {
+          messages.value.push({
+            id: generateId(),
+            role: 'assistant',
+            type: 'analysis',
+            content,
+          })
+        },
+
+        /* ECharts 图表配置 */
+        onChart(config: Record<string, unknown>) {
+          messages.value.push({
+            id: generateId(),
+            role: 'assistant',
+            type: 'chart',
+            chartConfig: config,
+          })
         },
 
         /* 高危 SQL 需要审批 */
