@@ -6,7 +6,8 @@
       "Bash(npm install *)",
       "Bash(npx vue-tsc *)",
       "Bash(git init *)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(uv add *)"
     ]
   }
 }

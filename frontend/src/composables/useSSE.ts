@@ -6,12 +6,16 @@ export interface SSEEventCallbacks {
   onStatus?: (content: string) => void
   /* Schema 信息 */
   onSchema?: (content: string) => void
-  /* 生成的 其他信息*/
+  /* 自然语言文本（分析/回答） */
   onText?: (content: string) => void
   /* 生成的 SQL 语句 */
   onSQL?: (content: string) => void
   /* 查询结果数据 */
   onResult?: (data: any[], columns: string[]) => void
+  /* 数据分析洞察 */
+  onAnalysis?: (content: string) => void
+  /* ECharts 图表配置 */
+  onChart?: (config: Record<string, unknown>) => void
   /* 错误信息 */
   onError?: (error: string) => void
   /* 流正常结束 */
@@ -26,6 +30,7 @@ interface SSEEventData {
   content?: string
   data?: any[]
   columns?: string[]
+  config?: Record<string, unknown>
   error?: string
   /* approval_required 事件专用字段 */
   thread_id?: string
@@ -160,6 +165,12 @@ export function useSSE() {
         break
       case 'done':
         callbacks.onDone?.()
+        break
+      case 'analysis':
+        callbacks.onAnalysis?.(event.content || '')
+        break
+      case 'chart':
+        callbacks.onChart?.(event.config || {})
         break
       case 'approval_required':
         callbacks.onApprovalRequired?.(

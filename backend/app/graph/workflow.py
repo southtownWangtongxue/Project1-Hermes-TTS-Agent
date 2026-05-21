@@ -30,8 +30,9 @@ from langgraph.types import interrupt, Command
 
 from app.agents.misc_agent import misc_agent
 from app.agents.orchestrator import analyze_intent, route_by_intent
+from app.agents.rag_agent import answer_with_rag
 from app.agents.schema_agent import get_table_schemas, filter_relevant_tables
-from app.agents.sql_coder import generate_sql, execute_sql
+from app.agents.sql_coder import generate_sql, execute_sql, generate_and_execute_sql
 from app.agents.security import classify_sql
 from app.agents.analyst import analyze_results
 from app.agents.reporter import generate_chart_config
@@ -374,25 +375,70 @@ def route_security(state: AgentState) -> str:
     return "finish"
 
 
+def route_schema(state: AgentState) -> str:
+    """
+    Schema 错误短路路由 —— 检测表结构加载是否出错。
+
+    路由规则：
+        - error_message 非空 → "finish"（短路，跳过后续 SQL 生成等节点）
+        - error_message 为空 → "sql_coder"（正常流转）
+
+    参数:
+        state: 当前 Agent 全局状态
+
+    返回:
+        下游节点名称: "sql_coder" 或 "finish"
+    """
+    error_message = state.get("error_message", "")
+    if error_message:
+        logger.warning("[Schema] 检测到错误，短路到 finish: %s", error_message)
+        return "finish"
+    return "sql_coder"
+
+
+def route_sql_coder(state: AgentState) -> str:
+    """
+    SQL Coder 错误短路路由 —— 检测 SQL 生成是否出错。
+
+    路由规则：
+        - error_message 非空 → "finish"（短路，跳过安全审查等后续节点）
+        - error_message 为空 → "security"（正常流转）
+
+    参数:
+        state: 当前 Agent 全局状态
+
+    返回:
+        下游节点名称: "security" 或 "finish"
+    """
+    error_message = state.get("error_message", "")
+    if error_message:
+        logger.warning("[SQLCoder] 检测到错误，短路到 finish: %s", error_message)
+        return "finish"
+    return "security"
+
+
 async def execute_node(state: AgentState) -> dict:
     """
     SQL 执行节点 —— 在业务数据库上执行已通过安全审核的 SQL。
 
-    设计说明：
-        仅调用 execute_sql() 执行单次 SQL，不启用自动重试。
-        SQL 生成的正确性由上游 sql_coder_node 保证。
-        如需自动重试（执行失败时反馈 LLM 修正），可在 sql_coder_node
-        中集成 sql_coder.generate_and_execute_sql 函数。
+    内置自纠错机制：
+        使用 generate_and_execute_sql 替代直接执行，当 SQL 执行失败时
+        （如语法错误、字段不存在），自动将错误信息反馈给 LLM 重新生成
+        修正后的 SQL，最多重试 2 次，避免单次失败即终止的脆弱性。
 
     参数:
-        state: 当前 Agent 全局状态，需包含 generated_sql
+        state: 当前 Agent 全局状态，需包含 generated_sql、user_question、
+               schema_info
 
     返回:
-        成功时：包含 query_result、query_columns 和 stage
+        成功时：包含 query_result、query_columns、generated_sql（可能已修正）
+               和 stage
         失败时：额外设置 error_message 描述失败原因
     """
     engine = get_engine()
     sql = state.get("generated_sql", "")
+    user_question = state.get("user_question", "")
+    schema_info = state.get("schema_info", "")
 
     if not sql:
         logger.warning("[Executor] 无可执行的 SQL")
@@ -401,28 +447,47 @@ async def execute_node(state: AgentState) -> dict:
             "stage": "executed",
         }
 
-    logger.info("[Executor] 执行 SQL: %s", sql[:120])
+    logger.info("[Executor] 执行 SQL（启用自纠错，最多 2 次重试）: %s", sql[:120])
 
     try:
-        result = await execute_sql(engine, sql)
+        # 使用 generate_and_execute_sql 获得自动重试能力
+        # 首次执行失败时，将错误反馈给 LLM 修正 SQL 后重新执行
+        result = await generate_and_execute_sql(
+            user_question=user_question,
+            engine=engine,
+            schema_info=schema_info,
+            max_retries=2,
+        )
 
         if not result["success"]:
-            logger.error("[Executor] SQL 执行失败: %s", result["error"])
+            logger.error(
+                "[Executor] SQL 执行失败（已重试 %d 次）: %s",
+                result["retries"],
+                result["error"],
+            )
             return {
                 "query_result": [],
                 "query_columns": [],
-                "error_message": f"SQL 执行失败: {result['error']}",
+                "error_message": (
+                    f"SQL 执行失败（已重试 {result['retries']} 次）: {result['error']}"
+                ),
                 "stage": "executed",
             }
 
         rows = result["data"]
         columns = list(rows[0].keys()) if rows else []
+        final_sql = result["sql"]
 
-        logger.info("[Executor] 查询完成，返回 %d 行数据", len(rows))
+        logger.info(
+            "[Executor] 查询完成，返回 %d 行数据（重试 %d 次）",
+            len(rows),
+            result["retries"],
+        )
 
         return {
             "query_result": rows,
             "query_columns": columns,
+            "generated_sql": final_sql,  # 可能已被 LLM 修正
             "stage": "executed",
         }
     except Exception as exc:
@@ -552,20 +617,40 @@ async def rag_node(state: AgentState) -> dict:
     RAG 检索节点 —— 处理帮助咨询类问题。
 
     当用户意图为 ask_help 时，Orchestrator 会将请求路由到此节点。
-    当前为占位实现，后续将对接 Milvus 向量数据库进行知识库检索，
-    返回相关文档作为分析结果。
+    调用 RAG Agent 从 Milvus 向量数据库检索相关操作规范和指标定义，
+    然后由 LLM 基于检索结果生成自然语言回答。
 
     参数:
-        state: 当前 Agent 全局状态
+        state: 当前 Agent 全局状态，需包含 user_question
 
     返回:
-        包含 analysis_text 和 stage 的部分状态更新
+        包含 analysis_text 和 stage 的部分状态更新；
+        检索或 LLM 调用失败时设置 error_message
     """
-    logger.info("[RAGAgent] RAG 检索阶段（当前为占位实现）")
-    return {
-        "analysis_text": "RAG 检索功能开发中",
-        "stage": "rag_done",
-    }
+    user_question = state.get("user_question", "")
+
+    if not user_question.strip():
+        logger.warning("[RAGAgent] 用户问题为空")
+        return {
+            "error_message": "用户问题为空",
+            "stage": "rag_done",
+        }
+
+    try:
+        logger.info("[RAGAgent] 开始 RAG 检索与回答: %s", user_question[:80])
+        answer = await answer_with_rag(user_question)
+        logger.info("[RAGAgent] RAG 回答完成: %s", answer[:80])
+
+        return {
+            "analysis_text": answer,
+            "stage": "rag_done",
+        }
+    except Exception as exc:
+        logger.exception("[RAGAgent] RAG 检索失败")
+        return {
+            "error_message": f"RAG 检索失败: {str(exc)}",
+            "stage": "rag_done",
+        }
 
 
 async def finish_node(state: AgentState) -> dict:
@@ -696,11 +781,25 @@ def get_graph():
         },
     )
 
-    # schema_agent → sql_coder（线性流转：加载表结构后生成 SQL）
-    builder.add_edge("schema_agent", "sql_coder")
+    # schema_agent → 条件路由：检测错误后短路到 finish，否则进入 sql_coder
+    builder.add_conditional_edges(
+        "schema_agent",
+        route_schema,
+        {
+            "sql_coder": "sql_coder",
+            "finish": "finish",
+        },
+    )
 
-    # sql_coder → security（线性流转：生成 SQL 后进行安全审核）
-    builder.add_edge("sql_coder", "security")
+    # sql_coder → 条件路由：检测错误后短路到 finish，否则进入 security
+    builder.add_conditional_edges(
+        "sql_coder",
+        route_sql_coder,
+        {
+            "security": "security",
+            "finish": "finish",
+        },
+    )
 
     # security → 条件路由：根据审核结果决定执行还是终止
     builder.add_conditional_edges(
@@ -721,6 +820,8 @@ def get_graph():
     # reporter → finish（图表生成完毕后进入结束节点）
     builder.add_edge("reporter", "finish")
 
+    # misc_agent → finish（杂项节点处理完毕后进入结束节点）
+    builder.add_edge("misc_agent", "finish")
     # rag_agent → finish（线性流转：RAG 检索完毕后进入结束节点）
     builder.add_edge("rag_agent", "finish")
 

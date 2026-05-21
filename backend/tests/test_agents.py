@@ -3,6 +3,7 @@ Agent 单元测试
 """
 import pytest
 from app.agents.security import mask_sensitive_data, classify_sql
+from app.agents.rag_agent import retrieve_knowledge
 
 
 class TestSecurityAgent:
@@ -78,3 +79,28 @@ class TestClassifySQL:
         """SHOW 语句应为安全"""
         result = await classify_sql("SHOW TABLES")
         assert result["category"] == "safe"
+
+
+class TestRAGAgent:
+    """RAG Agent 测试（不依赖 Milvus，验证降级行为）"""
+
+    @pytest.mark.asyncio
+    async def test_retrieve_empty_query(self):
+        """空查询应返回空字符串"""
+        result = await retrieve_knowledge("")
+        assert result == ""
+
+    @pytest.mark.asyncio
+    async def test_retrieve_whitespace_query(self):
+        """仅空白查询应返回空字符串"""
+        result = await retrieve_knowledge("   ")
+        assert result == ""
+
+    @pytest.mark.asyncio
+    async def test_retrieve_no_milvus_graceful_degradation(self):
+        """Milvus 不可用时应优雅降级返回空字符串（不抛异常）"""
+        result = await retrieve_knowledge("如何使用数据查询？")
+        # 无 Milvus 环境，应优雅降级返回空字符串
+        assert isinstance(result, str)
+        # 不应包含异常信息
+        assert "Traceback" not in result

@@ -13,6 +13,7 @@ import uuid
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from langgraph.errors import GraphInterrupt
 
 from app.graph.workflow import get_graph
 from app.utils.json_encoder import CustomEncoder
@@ -125,21 +126,37 @@ async def _stream_chat(question: str):
                     })
                 # ── schema_agent: 加载表结构 ──────────────
                 elif node_name == "schema_agent":
-                    logger.info("[SSE] schema_agent 阶段完成")
-                    yield _sse_event({
-                        "type": "status",
-                        "content": "正在加载数据表结构...",
-                    })
+                    error = state_update.get("error_message", "")
+                    if error:
+                        logger.warning("[SSE] schema_agent 错误: %s", error)
+                        yield _sse_event({
+                            "type": "error",
+                            "error": error,
+                        })
+                    else:
+                        logger.info("[SSE] schema_agent 阶段完成")
+                        yield _sse_event({
+                            "type": "status",
+                            "content": "正在加载数据表结构...",
+                        })
 
                 # ── sql_coder: SQL 生成 ──────────────────
                 elif node_name == "sql_coder":
-                    sql = state_update.get("generated_sql", "")
-                    if sql:
-                        logger.info("[SSE] 推送 SQL: %s", sql[:80])
+                    error = state_update.get("error_message", "")
+                    if error:
+                        logger.warning("[SSE] sql_coder 错误: %s", error)
                         yield _sse_event({
-                            "type": "sql",
-                            "content": sql,
+                            "type": "error",
+                            "error": error,
                         })
+                    else:
+                        sql = state_update.get("generated_sql", "")
+                        if sql:
+                            logger.info("[SSE] 推送 SQL: %s", sql[:80])
+                            yield _sse_event({
+                                "type": "sql",
+                                "content": sql,
+                            })
 
                 # ── security: SQL 安全审核 ───────────────
                 elif node_name == "security":
@@ -224,6 +241,22 @@ async def _stream_chat(question: str):
                     logger.info("[SSE] 工作流执行完毕")
                     yield _sse_event({"type": "done"})
 
+    except GraphInterrupt as gi:
+        # Human-in-the-loop 中断：高危 SQL 需要人工审批
+        # GraphInterrupt 是 LangGraph 的控制流机制，不是错误
+        interrupt_data = gi.args[0] if gi.args else {}
+        logger.info(
+            "[SSE] Graph 中断，等待人工审批: thread_id=%s, sql=%s",
+            thread_id,
+            interrupt_data.get("sql", "")[:80] if isinstance(interrupt_data, dict) else "",
+        )
+        yield _sse_event({
+            "type": "approval_required",
+            "thread_id": thread_id,
+            "question": question,
+            "sql": interrupt_data.get("sql", "") if isinstance(interrupt_data, dict) else "",
+            "reason": interrupt_data.get("reason", "") if isinstance(interrupt_data, dict) else "",
+        })
     except Exception as exc:
         logger.exception("[SSE] 流式对话异常")
         yield _sse_event({
