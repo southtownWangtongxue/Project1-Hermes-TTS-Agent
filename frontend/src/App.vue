@@ -2,7 +2,7 @@
 /**
  * App 根组件
  * 采用全屏 Flex 布局：顶部标题栏（含导航链接）+ 中间内容区（路由页面）
- * 聊天页面会撑满整个内容区域
+ * 设计风格：深色主题 + Apple 极简美学
  */
 import { useRoute } from 'vue-router'
 
@@ -12,12 +12,13 @@ const route = useRoute()
 interface NavItem {
   path: string
   label: string
+  icon: string
 }
 
 const navItems: NavItem[] = [
-  { path: '/', label: '首页' },
-  { path: '/chat', label: '智能对话' },
-  { path: '/approval', label: '审批管理' },
+  { path: '/', label: '首页', icon: 'home' },
+  { path: '/chat', label: '智能对话', icon: 'chat' },
+  { path: '/approval', label: '审批管理', icon: 'approval' },
 ]
 </script>
 
@@ -25,7 +26,22 @@ const navItems: NavItem[] = [
   <div class="app-container">
     <!-- 顶部标题栏 -->
     <header class="app-header">
-      <h1 class="app-title">DataAgent Pro</h1>
+      <div class="header-left">
+        <div class="logo">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect width="28" height="28" rx="6" fill="url(#logoGradient)"/>
+            <path d="M8 10h12M8 14h8M8 18h10" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="logoGradient" x1="0" y1="0" x2="28" y2="28">
+                <stop stop-color="#6366f1"/>
+                <stop offset="1" stop-color="#818cf8"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <h1 class="app-title">DataAgent Pro</h1>
+      </div>
+      
       <nav class="app-nav">
         <router-link
           v-for="item in navItems"
@@ -34,9 +50,31 @@ const navItems: NavItem[] = [
           class="nav-link"
           :class="{ active: route.path === item.path }"
         >
-          {{ item.label }}
+          <span class="nav-icon">
+            <svg v-if="item.icon === 'home'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9,22 9,12 15,12 15,22"/>
+            </svg>
+            <svg v-else-if="item.icon === 'chat'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <svg v-else-if="item.icon === 'approval'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M9 11l3 3L22 4"/>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+            </svg>
+          </span>
+          <span class="nav-label">{{ item.label }}</span>
         </router-link>
       </nav>
+      
+      <div class="header-right">
+        <button class="icon-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
     </header>
 
     <!-- 主内容区 -->
@@ -47,21 +85,15 @@ const navItems: NavItem[] = [
 </template>
 
 <style>
-/* 全局重置：确保全屏高度无留白 */
-*,
-*::before,
-*::after {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* === Import Design System === */
+@import './styles/design-system.css';
 
+/* === Global Reset === */
 html, body, #app {
   height: 100%;
   width: 100%;
-  overflow: hidden; /* 禁止外层滚动，由内部路由页面自行管理滚动 */
-  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', Arial, sans-serif;
+  overflow: hidden;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -70,57 +102,126 @@ html, body, #app {
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 0; /* 允许 flex 子元素正确收缩 */
+  min-height: 0;
+  background-color: var(--color-bg);
 }
 
+/* === Header === */
 .app-header {
   display: flex;
   align-items: center;
-  height: 56px;
-  padding: 0 24px;
-  background-color: #1a1a2e;
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 var(--space-6);
+  background-color: rgba(24, 24, 27, 0.8);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
   z-index: 100;
 }
 
-.app-title {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  margin-right: 32px;
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
-/* ===== 导航栏 ===== */
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--color-text-primary), var(--color-text-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* === Navigation === */
 .app-nav {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2);
 }
 
 .nav-link {
-  padding: 6px 16px;
-  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  color: var(--color-text-secondary);
   text-decoration: none;
-  transition: background-color 0.2s, color 0.2s;
+  transition: all var(--transition-fast);
+}
+
+.nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+}
+
+.nav-label {
+  transition: color var(--transition-fast);
 }
 
 .nav-link:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  background-color: rgba(99, 102, 241, 0.1);
+  color: var(--color-text-primary);
+}
+
+.nav-link:hover .nav-icon {
+  opacity: 1;
 }
 
 .nav-link.active {
-  background-color: rgba(64, 158, 255, 0.25);
-  color: #409eff;
+  background-color: rgba(99, 102, 241, 0.15);
+  color: var(--color-primary-light);
 }
 
+.nav-link.active .nav-icon {
+  opacity: 1;
+}
+
+/* === Header Right === */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.icon-btn:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-primary);
+}
+
+/* === Main Content === */
 .app-main {
   flex: 1;
-  min-height: 0; /* 关键：允许 flex 子元素收缩到内容以下，使内部滚动生效 */
-  background-color: #f5f7fa;
+  min-height: 0;
+  background-color: var(--color-bg);
 }
 </style>
